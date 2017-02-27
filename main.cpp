@@ -12,8 +12,7 @@ int main() {
     std::thread thr(thr_proc);
     while (!done_flag) {};
 
-    thr.join();
-
     std::cout << num << std::endl;
 
+    thr.join();
 }
