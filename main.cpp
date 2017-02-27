@@ -10,11 +10,11 @@ class Lock {
 public:
     void lock() {
         // Spin until flag is cleared
-        while (lock_flag.test_and_set()) {}
+        while (lock_flag.test_and_set(std::memory_order_acquire)) {}
     }
 
     void unlock() {
-        lock_flag.clear();
+        lock_flag.clear(std::memory_order_release);
     }
 };
 
