@@ -1,13 +1,22 @@
 project(CPlusPlusTest CXX)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-find_package(Boost 1.62.0 REQUIRED filesystem)
+set(Boost_USE_STATIC_LIBS ON)
+find_package(Boost 1.62.0 REQUIRED log_setup log)
 
 include_directories(${Boost_INCLUDE_DIRS})
-add_executable(main main.cpp)
 
-target_link_libraries(main ${Boost_LIBRARIES})
 
-message(STATUS "BOOST LIBRARIES: ${Boost_LIBRARIES}")
+# logger
+add_executable(logger logger.cpp)
+target_link_libraries(logger ${Boost_LIBRARIES})
+
+# object_pool
+add_executable(object_pool object_pool.cpp)
+target_link_libraries(object_pool ${Boost_LIBRARIES})
+
+add_executable(ifstream_with_fd ifstream_with_fd.cpp)
+
+add_executable(string_move_string_view_test string_move_string_view_test.cpp)

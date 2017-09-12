@@ -1,6 +1,7 @@
 #include "boost/filesystem.hpp"
 
 #include <algorithm>
+#include <chrono>
 #include <deque>
 #include <iostream>
 #include <random>
@@ -9,7 +10,7 @@
 
 boost::filesystem::path GenerateFileToBesorted() {
     // Generate the random data
-    uint64_t data_size = 1 * 1024 * 1024 * 1024; // 2^30 elements ~8GB
+    uint64_t data_size = 128 * 1024 * 1024; // 128 * 2^20 elements ~1GB
     
     boost::filesystem::path data_to_be_sorted_file = boost::filesystem::unique_path();
     std::ofstream data_to_be_sorted(data_to_be_sorted_file.string(), std::ios::binary);
@@ -32,10 +33,10 @@ std::vector<boost::filesystem::path> GenerateTemporaryFiles(boost::filesystem::p
     uint64_t data_size = boost::filesystem::file_size(input_file) / sizeof(uint64_t);
     
     // Split into files
-    uint64_t buffer_size = 1024 * 1024; // ~8MB
+    uint64_t temp_file_size = 16 * 1024 * 1024; // ~128MB
     
-    uint64_t num_temp_files = data_size / buffer_size;
-    if (data_size % buffer_size != 0) {
+    uint64_t num_temp_files = data_size / temp_file_size;
+    if (data_size % temp_file_size != 0) {
         ++num_temp_files;
     }
     
@@ -46,9 +47,9 @@ std::vector<boost::filesystem::path> GenerateTemporaryFiles(boost::filesystem::p
         temp_file_path = boost::filesystem::unique_path();
         std::ofstream temp_file_stream(temp_file_path.string(), std::ios::binary);
         
-        std::vector<uint64_t> buffer(buffer_size);
+        std::vector<uint64_t> buffer(temp_file_size);
         
-        input_file_stream.read(reinterpret_cast<char *>(buffer.data()), buffer_size * sizeof(uint64_t));
+        input_file_stream.read(reinterpret_cast<char *>(buffer.data()), temp_file_size * sizeof(uint64_t));
         auto actual_bytes_read = input_file_stream.gcount();
         
         std::sort(buffer.begin(), buffer.end());
@@ -100,7 +101,6 @@ public:
     }
     
     bool empty() const {
-        stream_.get().peek();
         return stream_.get().eof() && buffer_.empty();
     }
     
@@ -147,7 +147,7 @@ std::vector<boost::filesystem::path> MergeFiles(const std::vector<boost::filesys
         // Make a buffer for each temp_ifstream
         std::vector<ifstream_buffer<uint64_t>> temp_ifstream_buffers;
         for (auto & temp_ifstream : temp_ifstreams) {
-            temp_ifstream_buffers.emplace_back(temp_ifstream, 1);
+            temp_ifstream_buffers.emplace_back(temp_ifstream, 1024 * 1024); // 8 MB buffer
         }
         
         while (true) {
@@ -177,25 +177,32 @@ std::vector<boost::filesystem::path> MergeFiles(const std::vector<boost::filesys
 }
 
 int main() {
+    auto start_random_gen = std::chrono::steady_clock::now();
     auto data_to_be_sorted_file = GenerateFileToBesorted();
+    auto stop_random_gen = std::chrono::steady_clock::now();
+    
+    std::cout << "Random num gen took: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop_random_gen - start_random_gen).count() << " ms" << std::endl;
     
     std::cout << "Generated random numbers into data file: " << boost::filesystem::canonical(data_to_be_sorted_file.string()) << std::endl;
     
     // Split into chunks
+    auto start_split = std::chrono::steady_clock::now();
     auto temp_files = GenerateTemporaryFiles(data_to_be_sorted_file);
+    auto stop_split = std::chrono::steady_clock::now();
     
-//    std::cout << std::endl;
-//    for (auto & temp_file : temp_files) {
-//        std::cout << boost::filesystem::canonical(temp_file) << std::endl;
-//    }
+    std::cout << "Splitting took: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop_split - start_split).count() << " ms" << std::endl;
     
     // Now merge
     int n_way_merge = 16; // pick the n
     
+    auto start_merge = std::chrono::steady_clock::now();
     while (temp_files.size() != 1) {
         temp_files = MergeFiles(temp_files, n_way_merge);
     }
+    auto stop_merge = std::chrono::steady_clock::now();
     
     std::cout << std::endl;
     std::cout << temp_files[0].string() << std::endl;
+
+    std::cout << "Merging took: " << std::chrono::duration_cast<std::chrono::milliseconds>(stop_merge - start_merge).count() << " ms" << std::endl;
 }
