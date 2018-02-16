@@ -9,10 +9,6 @@ size_t A_BLOCK_SIZE = 5;
 
 class A {
 public:
-    void print() {
-        std::cout << "Hello World!" << std::endl;
-    }
-
     static void * operator new(std::size_t sz);
     static void * operator new[](std::size_t sz);
     static void operator delete(void * ptr, std::size_t sz) noexcept;
